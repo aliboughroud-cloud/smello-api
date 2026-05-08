@@ -39,7 +39,7 @@ AMBIANCES = {
 
 @app.route('/')
 def home():
-    return "<h1>Smell'O IA Active</h1><p>Prêt pour le mode local (LittleFS sur ESP32).</p>"
+    return "<h1>Smell'O IA Active</h1></p>"
 
 @app.route('/predict', methods=['POST'])
 def predict():
