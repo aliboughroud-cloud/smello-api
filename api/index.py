@@ -4,8 +4,10 @@ from supabase import create_client, Client
 app = Flask(__name__)
 
 # --- CONFIGURATION SUPABASE ---
+# Ton URL de projet et ta clé ANON (Public)
 SUPABASE_URL = "https://bemtohsqjieqnenmjeee.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlbXRvaHNxamllcW5lbm1qZWVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyMjE3NTEsImV4cCI6MjA5Mzc5Nzc1MX0.ROGbHuZM3j05Kv-G64qQcH1gtJpJNntWeE92nxPOp10"
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- DICTIONNAIRE DES 20 AMBIANCES ---
@@ -35,26 +37,40 @@ AMBIANCES = {
 
 @app.route('/')
 def home():
-    return "<h1>Smell'O API - Connectée à Supabase</h1><p>20 Ambiances actives.</p>"
+    return "<h1>Smell'O API - Statut OK</h1><p>Connectee a Supabase : bemtohsqjieqnenmjeee</p>"
 
+# ROUTE POUR L'IA (PREDICTION)
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
         data = request.get_json()
+        if not data: return jsonify({"error": "No JSON provided"}), 400
+        
         user_input = data.get("text", "").lower()
-        res = {"recette": {"p1":16,"p2":16,"p3":17,"p4":17,"p5":17,"p6":17}, "ambiance": "Signature", "msg": "Mélange spécial Smell'O."}
+        
+        # Recette par défaut
+        res_recette = {"p1":16,"p2":16,"p3":17,"p4":17,"p5":17,"p6":17}
+        ambiance_nom = "Signature"
+        message = "Votre parfum sur mesure par Smell'O."
 
+        # Recherche du mot clé dans les 20 ambiances
         for cle, valeur in AMBIANCES.items():
             if cle in user_input:
-                res["recette"] = valeur.copy()
-                res["ambiance"] = cle.capitalize()
-                res["msg"] = valeur["msg"]
-                if "msg" in res["recette"]: del res["recette"]["msg"]
+                res_recette = valeur.copy()
+                ambiance_nom = cle.capitalize()
+                message = res_recette.pop("msg") # On enlève 'msg' pour ne laisser que les pompes
                 break
-        return jsonify(res)
+        
+        return jsonify({
+            "status": "success",
+            "ambiance": ambiance_nom,
+            "recette": res_recette,
+            "message": message
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+# ROUTE POUR LES FAVORIS (SUPABASE)
 @app.route('/save-favorite', methods=['POST'])
 def save_favorite():
     try:
@@ -63,9 +79,21 @@ def save_favorite():
         recette = data.get("recette")
 
         if not nom or not recette:
-            return jsonify({"error": "Données manquantes"}), 400
+            return jsonify({"error": "Donnees manquantes (nom ou recette)"}), 400
 
-        supabase.table("favoris").insert({"nom_parfum": nom, "recette": recette}).execute()
-        return jsonify({"status": "success", "message": f"'{nom}' sauvé dans Supabase !"})
+        # Insertion dans la table 'favoris'
+        response = supabase.table("favoris").insert({
+            "nom_parfum": nom, 
+            "recette": recette
+        }).execute()
+        
+        return jsonify({
+            "status": "success", 
+            "message": f"Le parfum '{nom}' est enregistre !",
+            "data": response.data
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run()
